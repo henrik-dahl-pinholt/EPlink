@@ -26,3 +26,11 @@ Having already installed JAX, EPlink is installable from its `PyPI <https://pypi
 .. code-block:: bash
 
     $ pip install EPlink
+
+.. toctree::
+  :maxdepth: 2
+  :caption: Tutorials
+  :titlesonly:
+
+  Notebooks/Background_Posterior_Samples.ipynb
+  Notebooks/Quick_example.ipynb
