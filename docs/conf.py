@@ -6,6 +6,11 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
+#add path to allow autodoc to find files to generate documentation from
+import os
+import sys
+sys.path.insert(0, os.path.abspath("../"))
+
 project = 'EPlink'
 copyright = '2024, Henrik Dahl Pinholt'
 author = 'Henrik Dahl Pinholt'
@@ -13,7 +18,9 @@ author = 'Henrik Dahl Pinholt'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx_rtd_theme","nbsphinx"]
+extensions = ["sphinx_rtd_theme",
+              "nbsphinx",
+              'sphinx.ext.autodoc']
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
