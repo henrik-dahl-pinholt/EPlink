@@ -5,11 +5,14 @@
 
 
 .. toctree::
+   :caption: Overview
+   :hidden:
    :maxdepth: 2
-   :caption: Contents:
+
+   self
 
 
-EPlink
+Getting started
 ==================================
 EPlink is a Python package that allows you to fit models to connect enhancer-promoter distance measurements from live-cell imaging with MS2-type fluorescence transcription data.
 
