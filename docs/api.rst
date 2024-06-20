@@ -6,7 +6,7 @@ subpackages
 
 .. toctree::
 
-   cooltools.lib
+   EPlink.lib
 
 EPlink.Psamp module
 -----------------------------

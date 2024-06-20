@@ -20,7 +20,8 @@ author = 'Henrik Dahl Pinholt'
 
 extensions = ["sphinx_rtd_theme",
               "nbsphinx",
-              'sphinx.ext.autodoc']
+              'sphinx.ext.autodoc',
+              "sphinx.ext.napoleon"]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']

@@ -2,14 +2,23 @@ from jax import numpy as jnp
 import numpy as np
 import jax
 
-def Get_eigensystem(N): 
+def Get_eigensystem(N):  
     """_summary_
 
-    Args:
-        N (_type_): _description_
+    Parameters
+    ----------
+    N : _type_
+        _description_
 
-    Returns:
-        _type_: _description_
+    Returns
+    -------
+    A tuple of the form (Qmat,eigvals)
+
+    
+    Qmat : (N,N-1) ndarray
+        The N-1 eigenvectors of the spring matrix in the Fourier basis.
+    eigvals : (N-1) ndarray
+        The eigenvalues corresponding to the N-1 eigenvectors.
     """    
     ii,jj = jnp.meshgrid(jnp.arange(1,N+1),jnp.arange(2,N+1))
     Qmat = jnp.sqrt(2/N)*jnp.cos((ii-1/2)*(jj-1)*jnp.pi/N).T
