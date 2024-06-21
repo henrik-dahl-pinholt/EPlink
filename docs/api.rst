@@ -1,14 +1,7 @@
 API Reference
 =============
 
-subpackages
------------
-
-.. toctree::
-
-   EPlink.lib
-
-EPlink.Psamp module
+EPlink.Psamp
 -----------------------------
 
 .. automodule:: EPlink.Psamp

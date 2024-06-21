@@ -15,6 +15,8 @@ project = 'EPlink'
 copyright = '2024, Henrik Dahl Pinholt'
 author = 'Henrik Dahl Pinholt'
 
+
+
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
@@ -22,6 +24,9 @@ extensions = ["sphinx_rtd_theme",
               "nbsphinx",
               'sphinx.ext.autodoc',
               "sphinx.ext.napoleon"]
+
+# -- Napoleon configuration
+napoleon_google_docstring = False
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
