@@ -56,7 +56,8 @@ def convert_modes_M(matrix,Qmat):
     return jnp.einsum("jk,ij,lk->il",matrix,Qmat,Qmat)
 def convert_modes_V_ep(vector,M_vector):
     """Convenience function to convert a vector from Rouse modes to enhancer promoter distance, i.e. a projection of the physical coordinates. This transformation involves two transformations: first a basis transformation to physical coordinates, then a projection to enhancer promoter distance. This is encompassed in the M_vector which must be the left product of the sought projection vector w and the matrix Qmat.
-    .. math:: M_{j} = \\sum_i w_i Q_{ij}    
+    .. math:: 
+        M_{j} = \\sum_i w_i Q_{ij}    
 
     Parameters
     ----------
@@ -83,7 +84,8 @@ def convert_modes_M_ep(matrix,M_vector):
         Matrix in Rouse modes basis
     M_vector : (N-1) ndarray
         The left product of the sought projection vector w and the matrix Qmat.
-        .. math:: M_{j} = \\sum_i w_i Q_{ij}    
+        .. math:: 
+            M_{j} = \\sum_i w_i Q_{ij}    
 
     Returns
     -------
