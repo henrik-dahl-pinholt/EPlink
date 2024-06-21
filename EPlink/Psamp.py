@@ -3,18 +3,15 @@ import numpy as np
 import jax
 
 def Get_eigensystem(N):  
-    """_summary_
+    """Generate the eigenvectors and eigenvalues of the spring matrix in the Fourier basis. These are used to convert between physical coordinates and the Rouse modes in which the dynamics are diagonal.
 
     Parameters
     ----------
-    N : _type_
-        _description_
+    N : int
+        The number of beads in the polymer
 
     Returns
     -------
-    A tuple of the form (Qmat,eigvals)
-
-    
     Qmat : (N,N-1) ndarray
         The N-1 eigenvectors of the spring matrix in the Fourier basis.
     eigvals : (N-1) ndarray
@@ -26,13 +23,74 @@ def Get_eigensystem(N):
     return Qmat,eigvals
 
 def convert_modes_V(vector,Qmat):
+    """Convenience function to convert vector from physical coordinates to Rouse modes.
+
+    Parameters
+    ----------
+    vector : (N) ndarray
+        Vector of bead coordinates
+    Qmat : (N,N-1) ndarray
+        The N-1 eigenvectors of the spring matrix in the Fourier basis as output by Get_eigensystem.
+
+    Returns
+    -------
+    (N-1) ndarray
+        The vector in the Rouse modes.
+    """    
     return jnp.einsum("j,ij->i",vector,Qmat)
 def convert_modes_M(matrix,Qmat):
+    """Convenience function to convert matrix from physical coordinates to Rouse modes.
+
+    Parameters
+    ----------
+    matrix : (N,N) ndarray
+        Matrix which operates on bead coordinates
+    Qmat : (N,N-1) ndarray
+        The N-1 eigenvectors of the spring matrix in the Fourier basis as output by Get_eigensystem.
+
+    Returns
+    -------
+    (N-1,N-1) ndarray
+        The matrix in the Rouse modes basis.
+    """    
     return jnp.einsum("jk,ij,lk->il",matrix,Qmat,Qmat)
-def convert_modes_V_ep(vector,M_matrix):
-    return jnp.einsum("j,j->",vector,M_matrix)
-def convert_modes_M_ep(matrix,M_matrix):
-    return jnp.einsum("jk,j,k->",matrix,M_matrix,M_matrix)
+def convert_modes_V_ep(vector,M_vector):
+    """Convenience function to convert a vector from Rouse modes to enhancer promoter distance, i.e. a projection of the physical coordinates. This transformation involves two transformations: first a basis transformation to physical coordinates, then a projection to enhancer promoter distance. This is encompassed in the M_vector which must be the left product of the sought projection vector w and the matrix Qmat.
+    .. math:: M_{j} = \\sum_i w_i Q_{ij}    
+
+    Parameters
+    ----------
+    vector : (N-1) ndarray
+        Vector in Rouse modes basis
+    M_vector : (N-1) ndarray
+        The left product of the sought projection vector w and the matrix Qmat.
+        .. math:: M_{j} = \\sum_i w_i Q_{ij}    
+
+    Returns
+    -------
+    float
+        The enhancer promoter distance described by the rouse mode vector.
+    """    
+    return jnp.einsum("j,j->",vector,M_vector)
+
+def convert_modes_M_ep(matrix,M_vector):
+    """Convenience function to convert a matrix from Rouse modes to enhancer promoter distance basis, see convert_modes_V_ep for a definition of the M_vector.
+    
+
+    Parameters
+    ----------
+    matrix : (N-1,N-1) ndarray
+        Matrix in Rouse modes basis
+    M_vector : (N-1) ndarray
+        The left product of the sought projection vector w and the matrix Qmat.
+        .. math:: M_{j} = \\sum_i w_i Q_{ij}    
+
+    Returns
+    -------
+    float
+        The matrix operation in the enhancer promoter distance projected space.
+    """
+    return jnp.einsum("jk,j,k->",matrix,M_vector,M_vector)
 
 
 @jax.jit
