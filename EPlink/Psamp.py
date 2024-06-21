@@ -55,17 +55,15 @@ def convert_modes_M(matrix,Qmat):
     """    
     return jnp.einsum("jk,ij,lk->il",matrix,Qmat,Qmat)
 def convert_modes_V_ep(vector,M_vector):
-    """Convenience function to convert a vector from Rouse modes to enhancer promoter distance, i.e. a projection of the physical coordinates. This transformation involves two transformations: first a basis transformation to physical coordinates, then a projection to enhancer promoter distance. This is encompassed in the M_vector which must be the left product of the sought projection vector w and the matrix Qmat.
-    .. math:: 
-        M_{j} = \\sum_i w_i Q_{ij}    
+    """Convenience function to convert a vector from Rouse modes to enhancer promoter distance, i.e. a projection of the physical coordinates. This transformation involves two transformations: first a basis transformation to physical coordinates, then a projection to enhancer promoter distance. This is encompassed in the M_vector which must be the left product of the sought projection vector w and the matrix Qmat, i.e. M = w.T Q.
+     
 
     Parameters
     ----------
     vector : (N-1) ndarray
         Vector in Rouse modes basis
     M_vector : (N-1) ndarray
-        The left product of the sought projection vector w and the matrix Qmat.
-        .. math:: M_{j} = \\sum_i w_i Q_{ij}    
+        The left product of the sought projection vector w (in physical coordinate basis) and the matrix Qmat, i.e. M = w.T Q.   
 
     Returns
     -------
@@ -83,9 +81,7 @@ def convert_modes_M_ep(matrix,M_vector):
     matrix : (N-1,N-1) ndarray
         Matrix in Rouse modes basis
     M_vector : (N-1) ndarray
-        The left product of the sought projection vector w and the matrix Qmat.
-        .. math:: 
-            M_{j} = \\sum_i w_i Q_{ij}    
+        The left product of the sought projection vector w (in physical coordinate basis) and the matrix Qmat, i.e. M = w.T Q.
 
     Returns
     -------
@@ -100,6 +96,7 @@ def Propagate_Forward_diagonal(mu,timestep,k,eigvals,D):
     eigexp = jnp.exp(-k*eigvals*timestep)
     return mu*eigexp,(D/(k*eigvals))*(1-jnp.exp(-2*k*eigvals*timestep))
 forward_d_vmap = jax.vmap(Propagate_Forward_diagonal,in_axes=(0,None,None,None,None))
+
 def Gen_ss_samp(N,D,k,nsamples):
     Qmat,eigvals = Get_eigensystem(N)
     gaussian_samples = np.random.normal(0,1,size=(nsamples,N-1))
@@ -107,6 +104,7 @@ def Gen_ss_samp(N,D,k,nsamples):
     Rouse_confs = mean_0+gaussian_samples*np.sqrt(covar_0)
     confs = np.einsum("jk,lk->jl",Rouse_confs,Qmat) 
     return confs
+
 def Generate_trajectory(nsteps,dt,n_trajectories,k,D,N,seed=0):
     if not type(nsteps) == int:
         raise ValueError("nsteps must be an integer")
