@@ -2,4 +2,3 @@ numpy
 psutil
 GPUtil
 tqdm
-distutils

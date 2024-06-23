@@ -5,4 +5,3 @@ ipython
 psutil
 GPUtil
 tqdm
-distutils
