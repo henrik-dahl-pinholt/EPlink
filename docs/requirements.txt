@@ -2,3 +2,6 @@ sphinx_rtd_theme
 nbsphinx
 jax
 ipython
+psutil
+GPUtil
+tqdm

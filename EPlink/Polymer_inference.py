@@ -1,7 +1,7 @@
 from jax import numpy as jnp
 import numpy as np
 import jax
-
+"""This module contains code to simulate polymer dynamics, generate measurements of enhancer-promoter distances, and infer polymer positions from two-locus microscopy measurements. The polymer is modeled as a chain of beads connected by springs with dynamics described by the Rouse model."""
 def Get_eigensystem(N):  
     """Generate the eigenvectors and eigenvalues of the spring matrix in the Fourier basis. These are used to convert between physical coordinates and the Rouse modes in which the dynamics are diagonal.
 
