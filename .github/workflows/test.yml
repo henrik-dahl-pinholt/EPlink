@@ -20,7 +20,6 @@ jobs:
         pip install -U "jax[cuda12]"
         pip install -r requirements.txt
         pip install pytest
-        sudo apt-get install python3-distutils
 
     - name: Run tests
       run: |
