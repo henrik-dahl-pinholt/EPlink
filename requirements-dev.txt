@@ -1,0 +1,5 @@
+# Inherit requirements from the main requirements file
+-r requirements.txt
+
+# Development and testing dependencies
+dill
