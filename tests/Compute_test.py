@@ -7,7 +7,7 @@ import subprocess
 from multiprocessing.pool import ThreadPool as Pool
 from functools import partial
 import dill
-
+import jax
 
 
 
@@ -55,25 +55,24 @@ def execute_simultaneously(function_to_run):
 
         # Start pool process using multiprocessing for asynchronous execution
         p_remote_function = partial(remote_function, function_to_run)
-        pool = Pool(processes=2)
+        pool = Pool(processes=1)
         
-        # start the remote process and the local process
+        # start the remote process 
+        kwargs["process_id"] = 1 # set the process id to 1 for the remote process
         remote_result = apply_async(pool, p_remote_function, args, kwargs)
-        local_result = apply_async(pool,function_to_run, args, kwargs)
+        
+        # run the local function
+        local_result = function_to_run(*args, **kwargs)
+        
         
         # Get the results from the pool (join blocks until all processes are done)
         pool.close()
         # local_out = local_result.get()
         # remote_out = remote_result.get()
-        pool.join()
+        # pool.join()
 
         return local_result, remote_result
     return runfunc
-
-@execute_simultaneously
-def fun_to_run():
-    print("hello")
-    return 5
 
 
 def test_runner():
@@ -93,8 +92,9 @@ def test_runner():
     result = runner.Run(print_stats=True)
     assert len(result) == 4
     assert result == list(iterable)
-    
-    
 
     
-    
+
+
+# print(b.get(),a.get())
+

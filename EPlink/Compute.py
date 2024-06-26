@@ -1,12 +1,13 @@
 import psutil
 import GPUtil
 from tqdm import tqdm
-import time
-
+import jax
+from jax.experimental import mesh_utils
+from jax.sharding import PositionalSharding
 """This module contains code to simplify batch evaluation of functions from other modules in large computations."""
 
 class Runner:
-    """This class contains the runner class. An object sought to streamline batch evaluation of large computations in a common framework which easily works with JAXs computational model. The class was introduced to display progress and combat memory overloads in computations which were in principle embarrassingly parallelizable. 
+    """This class contains the runner class. An object sought to streamline batch evaluation of large computations in a common framework which easily works with JAXs computational model. The class was introduced to display progress, allow batch computation to combat memory overloads, and to excecute jax code in a distributed fashion across multiple hosts. 
     
     The runner object takes an iterable, and a function upon initialization. The function is called on each element of the iterable to perform the computation. As an optional argument, an aggregation function can be passed to the class in which case outputs are collected in a list and passed to the aggregation function when the iterator is empty. By letting it be up to the iterable to feed data, the size of the calculations can be easily managed, and parallelization across GPUs is easily accomplished by sharding the data fed by the iterable."""
     def __init__(self,iterable,func,aggregation_func=None):
@@ -15,15 +16,17 @@ class Runner:
         Parameters
         ----------
         iterable : iterable
-            The iterable to be fed to the function func.
+            The iterable to be fed to the function func. 
         func : function
             The function to be called on each element of the iterable. 
         aggregation_func : function, optional
             The function to be called on a list of the collected result of func on the elements of the iterator. Should take as input a list of the results. If specified, calling the Run() method will return the result of this function. If not specified, the Run() method will just return the list of outputs directly.
         """
+        
         self.iterable = iterable
         self.func = func
         self.agg_f = aggregation_func
+
 
     def get_system_metrics(self):
         """Grabs system metrics such as CPU usage, memory usage, GPU usage, GPU memory usage, GPU memory used, and GPU memory total.
@@ -80,4 +83,19 @@ class Runner:
             return results
             
 
+class ZeroGenerator:
+    def __init__(self,zero_shape,nbatches):
+        self.nbatches = nbatches
+        self.counter = 0
+        self.shape = zero_shape
     
+    def __iter__(self):
+        self.counter = 0
+        return self
+    def __next__(self):
+        data = jax.numpy.zeros(self.shape)
+        if self.counter < self.nbatches:
+            self.counter += 1
+            return data
+        else:
+            raise StopIteration
