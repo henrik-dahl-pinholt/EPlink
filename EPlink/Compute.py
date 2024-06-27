@@ -83,19 +83,66 @@ class Runner:
             return results
             
 
-class ZeroGenerator:
-    def __init__(self,zero_shape,nbatches):
-        self.nbatches = nbatches
-        self.counter = 0
-        self.shape = zero_shape
+# class ZeroGenerator:
+#     def __init__(self,zero_shape,nbatches):
+#         self.nbatches = nbatches
+#         self.counter = 0
+#         self.shape = zero_shape
     
-    def __iter__(self):
-        self.counter = 0
-        return self
-    def __next__(self):
-        data = jax.numpy.zeros(self.shape)
-        if self.counter < self.nbatches:
-            self.counter += 1
-            return data
-        else:
-            raise StopIteration
+#     def __iter__(self):
+#         self.counter = 0
+#         return self
+#     def __next__(self):
+#         data = jax.numpy.zeros(self.shape)
+#         if self.counter < self.nbatches:
+#             self.counter += 1
+#             return data
+#         else:
+#             raise StopIteration
+# class NormalGenerator:
+#     """Generates unit normal random variates of a given shape. 
+#     """
+#     def __init__(self,shape,nbatches,seed):
+#         """Initializes the NormalGenerator object.
+
+#         Parameters
+#         ----------
+#         shape : tuple
+#             The shape of the random variates to be generated in each iteration.
+#         nbatches : int
+#             Number of batches (iterations) to generate. The iterator will stop after this number of batches.
+#         seed : int
+#             Seed for the random number generator.
+#         """
+#         self.nbatches = nbatches
+#         self.counter = 0
+#         self.shape = shape
+#         self.seed = seed
+#     def __len__(self):
+#         return self.nbatches
+#     def __iter__(self):
+#         self.key = jax.random.PRNGKey(self.seed)
+#         self.counter = 0
+#         return self
+#     def __next__(self):
+#         """Splits key and draws random numbers from a normal distribution.
+
+#         Returns
+#         -------
+#         jax.Array
+#             array of random numbers drawn from a normal distribution.
+
+#         Raises
+#         ------
+#         StopIteration
+#             Stops iteration if the number of batches has been reached.
+#         """
+#         #split key to not draw same random numbers every time
+#         old_key, self.key = jax.random.split(self.key)
+#         #draw random numbers
+#         data = jax.random.normal(self.key,shape=self.shape)
+#         if self.counter < self.nbatches:
+#             self.counter += 1
+#             return data
+#         else:
+#             raise StopIteration
