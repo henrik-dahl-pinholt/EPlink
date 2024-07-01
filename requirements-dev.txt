@@ -2,5 +2,4 @@
 -r requirements.txt
 
 # Development and testing dependencies
-dill # for pytest pickling functions to send in testing multihost computations
-rich # for visualizing data distribution on sharded arrays
+matplotlib # For running the notebooks
