@@ -439,6 +439,9 @@ class PosteriorSampler:
         self.forward_filter.Run()
         
     def sample(self,nsamples,dt,seed=0,compute_density=False,verbose=False):
+        if dt>1/self.k:
+            # raise warning that the time step is too large
+            print("Warning: The time step may be too large for the sampling to be accurate. It may blow up")
         nsteps = int(self.observation_times[-1]/dt)
         times = np.arange(0,nsteps)[::-1]*dt 
         sub_samps = np.zeros((len(self.measurements),nsamples,len(times)))
