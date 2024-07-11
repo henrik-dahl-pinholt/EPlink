@@ -239,33 +239,6 @@ forward_d_vmap.__doc__ = """Vectorized version of Propagate_Forward_diagonal. Ta
         Diagonal entries of the Rouse mode covariance matrix after the timestep (all off-diagonal entries are zero for the deterministic initial condition).
     """
 
-# def Gen_ss_samp(N,D,k,nsamples):
-#     Qmat,eigvals = Get_eigensystem(N)
-#     gaussian_samples = np.random.normal(0,1,size=(nsamples,N-1))
-#     mean_0,covar_0 = np.zeros((nsamples,N-1)),(D/k/eigvals)*np.ones((nsamples,N-1))
-#     Rouse_confs = mean_0+gaussian_samples*np.sqrt(covar_0)
-#     confs = np.einsum("jk,lk->jl",Rouse_confs,Qmat) 
-#     return confs
-
-# def Generate_trajectory(nsteps,dt,n_trajectories,k,D,N,seed=0):
-#     if not type(nsteps) == int:
-#         raise ValueError("nsteps must be an integer")
-#     Qmat,eigvals = Get_eigensystem(N)
-#     key = jax.random.PRNGKey(seed)
-#     T = nsteps*dt
-#     # nsteps = int(T/dt)
-#     a_samples = np.zeros((nsteps,n_trajectories,N-1))
-#     mean_0,covar_0 = jnp.zeros((n_trajectories,N-1)),(D/k/eigvals)*jnp.ones((n_trajectories,N-1))
-    
-#     gaussian_samples = jax.random.normal(key,(n_trajectories,nsteps,N-1))
-#     a_samples[0] =  mean_0+gaussian_samples[:,0]*jnp.sqrt(covar_0)
-#     for i in range(1,nsteps):
-#         new_mean,new_cov = forward_d_vmap(a_samples[i-1],dt,k,eigvals,D)
-        
-#         a_samples[i] = new_mean+gaussian_samples[:,i]*jnp.sqrt(new_cov)
-#     polymer_coords = jnp.einsum("ijk,lk->ijl",a_samples,Qmat) 
-#     return np.arange(0,len(polymer_coords))*dt,polymer_coords
-
 def Generate_trajectory(nsteps,dt,n_trajectories,k,D,N,seed=0,verbose=False):
     """Generate a trajectory of a polymer chain with Rouse dynamics starting from the steady-state ensemble
 
@@ -303,7 +276,8 @@ def Generate_trajectory(nsteps,dt,n_trajectories,k,D,N,seed=0,verbose=False):
     """
     if not type(nsteps) == int:
         raise ValueError("nsteps must be an integer")
-    
+    if N<=1:
+        raise ValueError("N must be greater than 1 as the center of mass mode is not explicitly treated. If N=1, all trajectories would just give zero by definition.")    
     # compute the eigensystem of the spring matrix
     Qmat,eigvals = Get_eigensystem(N)
     
@@ -362,7 +336,27 @@ def Generate_measurements(traj,w,measurement_errors,seed=0):
 
 
 class ForwardFilter:
+    """Class to run a Kalman filter aka forward filter on the Rouse model"""
     def __init__(self,N,k,D,measurements,observation_times,measurement_errors,w):
+        """Initialize the Kalman filter
+
+        Parameters
+        ----------
+        N : int
+            Number of beads in the polymer
+        k : float
+            Spring constant of the Rouse model
+        D : float
+            Diffusion constant of the Rouse model
+        measurements : (nsamples,ntimesteps) jax array
+            Array of measurements of enhancer-promoter distances
+        observation_times : jax array
+            Array of times at which the measurements are taken
+        measurement_errors : (nsamples) jax array or float
+            Standard deviation of the Gaussian measurement noise, if float, will be broadcasted to all measurements
+        w : (N) jax array
+            Projection vector from which the measurement was obtained from the polymer configurations.
+        """
         # Store the model parameters
         self.D,self.k,self.N = D,k,N
         self.w = w
@@ -389,6 +383,7 @@ class ForwardFilter:
         self.hasrun = False
         
     def Run(self):
+        """Runs the Kalman filter"""
         # Loop over the observations
         for i in tqdm(list(range(len(self.observation_times)))):
             # Update to get the posterior ensemble
@@ -401,32 +396,73 @@ class ForwardFilter:
         self.hasrun = True
             
     def Get_Posteriors(self):
-        return jnp.einsum("ijk,k->ij",self.post_means,self.M_matrix),jnp.einsum("ijkl,k,l->ij",self.post_covs,self.M_matrix,self.M_matrix)
+        """Returns the Kalman filter means and variances right after measurement updates. Note that these are projected values to the measurement space defined by w and that the full polymer filter values are stored internally but not returned with this function. 
+        
+        Posterior here is not to be mistaken for the posterior samples returned by the PosteriorSampler class. Posterior here just means after the measurement update of the Kalman filter.
+
+        Returns
+        -------
+        pmean : (nsamples,ntimesteps) jax array
+            Posterior mean for the the EP separation at each time step for each sample
+        pvar : (nsamples,ntimesteps) jax array
+            Posterior variance for the the EP separation at each time step for each sample
+        """
+        pmean = jnp.einsum("ijk,k->ij",self.post_means,self.M_matrix)
+        pvar = jnp.einsum("ijkl,k,l->ij",self.post_covs,self.M_matrix,self.M_matrix)
+        return pmean, pvar
     def Get_priors(self):
+        """Returns the Kalman filter means and variances right before measurement updates. Note that these are projected values to the measurement space defined by w and that the full polymer filter values are stored internally but not returned with this function.
+
+        Returns
+        -------
+        pmean : (nsamples,ntimesteps) jax array
+            Prior mean for the the EP separation at each time step for each sample
+        pvar : (nsamples,ntimesteps) jax array
+            Prior variance for the the EP separation at each time step for each sample
+        """
         return jnp.einsum("ijk,k->ij",self.prior_means,self.M_matrix),jnp.einsum("ijkl,k,l->ij",self.prior_covs,self.M_matrix,self.M_matrix)
     def __getitem__(self,time):
+        """Interpolates the value of the filter between the observation times
+
+        Parameters
+        ----------
+        time : float
+            Time at which to interpolate the filter
+
+        Returns
+        -------
+        mean : (nsamples,N-1) jax array
+            Mean of the filter at the time
+        cov : (nsamples,N-1,N-1) jax array
+            Covariance of the filter at the time
+        """
         ind = np.max(np.argwhere(self.observation_times<time)) if time>self.observation_times[0] else 0
         t_closest = self.observation_times[ind]
         t_diff = time-t_closest
         return Propagate_Forward_vmap(self.post_means[:,ind],self.post_covs[:,ind],t_diff,self.k,self.D,self.eigvals)
-    def Convert_to_observations(self,means,covs):
-        return jnp.einsum("ijk,k->ij",means,self.M_matrix),jnp.einsum("ijkl,k,l->ij",covs,self.M_matrix,self.M_matrix)
-    def Get_filter_at_continous_times(self,times,convert=True):            
-        if not self.hasrun:
-            print("Running the filter at the measurements")
-            self.Run()
-        else:
-            print("Computing the filter at continuous times")
-            ms,covs = np.zeros((len(self.measurements),len(times),self.N-1)),np.zeros((len(self.measurements),len(times),self.N-1,self.N-1))
-            for i in tqdm(range(len(times))):
-                ms[:,i],covs[:,i] = self[times[i]]
-        if convert:
-            return self.Convert_to_observations(ms,covs)
-        else:
-            return ms,covs
             
 class PosteriorSampler:
+    """Class to sample from the posterior given a set of measurements of a polymer configuration """
     def __init__(self,N,k,D,measurements,observation_times,measurement_errors,w):
+        """Initialize the PosteriorSampler
+
+        Parameters
+        ----------
+        N : int
+            Number of beads in the polymer
+        k : float
+            Spring constant of the Rouse model
+        D : float
+            Diffusion constant of the Rouse model
+        measurements : (nsamples,ntimesteps) jax array
+            Array of measurements of enhancer-promoter separations
+        observation_times : (ntimesteps) jax array
+            Array of times at which the measurements are taken
+        measurement_errors : (nsamples) jax array or float
+            Standard deviation of the Gaussian measurement noise, if float, will be broadcasted to all measurements
+        w : (N) jax array
+            Projection vector from which the measurement was obtained from the polymer configurations.
+        """
         self.D,self.k,self.N = D,k,N
         self.measurements = measurements
         self.observation_times = observation_times
@@ -439,6 +475,33 @@ class PosteriorSampler:
         self.forward_filter.Run()
         
     def sample(self,nsamples,dt,seed=0,compute_density=False,verbose=False):
+        """Compute samples from the posterior
+
+        Parameters
+        ----------
+        nsamples : int
+            Number of samples to draw
+        dt : float
+            Time step for the simulation. Note that if this is too big, the simulation can blow up.
+        seed : int, optional
+            seed for the random number generator, by default 0
+        compute_density : bool, optional
+            Wether to compute and return the posterior density as well, by default False
+        verbose : bool, optional
+            Wether to print progress, by default False
+
+        Returns
+        -------
+        times : ndarray
+            Array of times at which the samples are taken
+        samples : (nsamples,ntimesteps) jax array
+            Samples from the posterior at each time step for each sample. These are projected to the measurement space defined by w.
+        means : (nsamples,ntimesteps) jax array
+            Means of the posterior at each time step for each sample. These are projected to the measurement space defined by w. Only returned if compute_density is True.
+        var : (nsamples,ntimesteps) jax array
+            Variances of the posterior at each time step for each sample. These are projected to the measurement space defined by w. Only returned if compute_density is True.
+
+        """
         if dt>1/self.k:
             # raise warning that the time step is too large
             print("Warning: The time step may be too large for the sampling to be accurate. It may blow up")
@@ -452,7 +515,6 @@ class PosteriorSampler:
         init_mean,init_cov = self.forward_filter.post_means[:,-1],self.forward_filter.post_covs[:,-1]
         subkey = jax.random.PRNGKey(seed)
         
-        # sub_samps[:,:,0] = np.array([jax.random.multivariate_normal(subkey,init_mean[k],init_cov[k],shape=(nsamples,)) for k in range(len(init_mean))])
         curr_val = np.array([jax.random.multivariate_normal(subkey,init_mean[k],init_cov[k],shape=(nsamples,)) for k in range(len(init_mean))])
         sub_samps[:,:,0] = curr_val@self.M_matrix.T
         if compute_density:
@@ -467,10 +529,9 @@ class PosteriorSampler:
         for i in iterator:
             fmean,fvar =  self.forward_filter[times[i-1]]
             invdrift = jnp.array([jnp.linalg.inv(f) for f in fvar])
-            # fmean_repeated = np.array([fmean for _ in range(nsamples)]).swapaxes(0,1)
             
             key,subkey = jax.random.split(subkey)
-            # gauss_samp = jax.random.normal(key,sub_samps[:,:,i].shape)
+            
             gauss_samp = jax.random.normal(key,curr_val.shape)
             
             F_t = np.array([jnp.diag(self.eigvals*self.k) for _ in range(len(fvar))])
@@ -488,17 +549,9 @@ class PosteriorSampler:
                 curr_mean = curr_mean +dt*(deterministic_term-data_term)
                 means[:,i],covs[:,i] = curr_mean@self.M_matrix.T,jnp.einsum("ikj,k,j->i",curr_cov,self.M_matrix,self.M_matrix)
                 
-                
-                
-            # sub_samps[:,:,i] = sub_samps[:,:,i-1]+dt*(self.eigvals*self.k-2*self.D*jnp.einsum("ikl,ilm->ikm",(sub_samps[:,:,i-1]-fmean[:,None,:]),invdrift))+jnp.sqrt(2*self.D*dt)*gauss_samp
             sub_samps[:,:,i] = curr_val@self.M_matrix.T
-        # print("Converting the paths to observations")
-        # output = np.zeros((len(self.measurements),nsamples,len(times)))    
-        # for i in tqdm(list(range(len(times)))):    
-        #     # output[:,:,i] = jnp.einsum("ijk,k->ij",sub_samps[:,:,i],self.M_matrix)
-        #     output[:,:,i] = sub_samps[:,:,i]@self.M_matrix.T
-        # return times,output
+        
         if not compute_density:
-            return times,sub_samps
+            return times[::-1],sub_samps[::-1]
         else:
-            return times,sub_samps,means,covs
+            return times[::-1],sub_samps[::-1],means,covs
