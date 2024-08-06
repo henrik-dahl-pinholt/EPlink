@@ -63,7 +63,6 @@ def get_cp_transition_matrix(T,window_size):
     
     for i, state_i in enumerate(itertools.product(range(nstates),repeat=window_size)):
         for j, state_j in enumerate(itertools.product(range(nstates),repeat=window_size)):
-            print(state_i,state_j)
             # Check if the states are connected
             if state_j[1:] == state_i[:-1]:
                 data.append(T[state_i[-1],state_j[-1]])
@@ -134,7 +133,7 @@ def Unwrap_cp_probabilities(cp_probs,smap,window_size):
     list
         List with the probability vectors of the single state sequence corresponding to the compound state sequence
     """
-    nstates = int(len(cp_probs)**(1/window_size))
+    nstates = int(len(cp_probs[0])**(1/window_size))
     
     # to compare with the cp states we unwrap them to the single states
     cp_unwrapped = []
@@ -144,37 +143,51 @@ def Unwrap_cp_probabilities(cp_probs,smap,window_size):
         cp_unwrapped.append(state)
     
     # unwrap the rest of the states by only adding the newest state
-    for i in range(1,nsteps+1):
+    for i in range(1,len(cp_probs)):
         unwrapped_last = Project_to_single_states(cp_probs[i],smap,[window_size-1],nstates)
         cp_unwrapped.append(unwrapped_last[0])
     return cp_unwrapped
 
     
     
-nstates = 2
-window_size = 3
-k_on = 2
-k_off = 1
+# nstates = 2
+# window_size = 3
+# k_on = 2
+# k_off = 1
 
-T = get_transition_matrix(nstates,k_on,k_off)
-
-
-# test that propagation under both the single and compound promoter models are the same
-dt = 0.01
-nsteps = 100
-
-state_0 = np.array([0,1]) # start in the on state
-# we start the cp state by making the last state on and the rest off
-smap = Generate_state_map(nstates,window_size)
-state_0_cp = np.zeros(nstates**window_size)
-state_0_cp[smap["001"]] = 1
+# T = get_transition_matrix(nstates,k_on,k_off)
 
 
-T_mat_sp = get_cp_transition_matrix(np.eye(nstates)+dt*T,window_size)
+# # test that propagation under both the single and compound promoter models are the same
+# dt = 0.01
+# nsteps = 100
 
-# propagate the single promoter model for nsteps
-states = [state_0]
-states_cp = [state_0_cp]
-for i in range(nsteps):
-    states.append(states[-1] + dt*T@states[-1])
-    states_cp.append(T_mat_sp@states_cp[-1])
+# state_0 = np.array([0,1]) # start in the on state
+# # we start the cp state by making the last state on and the rest off
+# smap = Generate_state_map(nstates,window_size)
+# state_0_cp = np.zeros(nstates**window_size)
+# state_0_cp[smap["001"]] = 1
+
+
+# T_mat_sp = get_cp_transition_matrix(np.eye(nstates)+dt*T,window_size)
+
+# # propagate the single promoter model for nsteps
+# states = [state_0]
+# states_cp = [state_0_cp]
+# for i in range(nsteps):
+#     states.append(states[-1] + dt*T@states[-1])
+#     states_cp.append(T_mat_sp@states_cp[-1])
+
+# # unwrap the cp states to the single states
+# unwrapped_cp = Unwrap_cp_probabilities(states_cp,smap,window_size)
+
+# np.array(states).shape
+# # plot the results
+# a_states = np.array(states)
+# a_states_cp = np.array(unwrapped_cp[window_size-1:])
+
+# np.allclose(a_states,a_states_cp)
+# plt.plot(a_states[:,0])
+# plt.plot(a_states[:,1])
+# plt.plot(a_states_cp[:,0],linestyle="--")
+# plt.plot(a_states_cp[:,1],linestyle="--")
