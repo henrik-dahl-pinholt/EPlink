@@ -5,7 +5,7 @@ import jax
 from jax import numpy as jnp
 from jax.experimental import mesh_utils
 from jax.sharding import PositionalSharding
-from EPlink import Lfit
+from EPlink import Experimental_Lfit
 from scipy.optimize import minimize
 """This module contains code to simplify batch evaluation of functions from other modules in large computations."""
 
@@ -135,10 +135,10 @@ class GP_model:
         self.pbar.update()
         self.pbar.set_description(f"Params: {params} | LLH: {llh}")
     def single_LLH(self,params,sample,data_traj):
-        predictions = Lfit.GP_predict(params,data_traj,sample,self.paramdict["window_size"],self.paramdict["dt"],self.paramdict["upscale_factor"],self.paramdict["weighting_kernel"],self.paramdict["gamma_trans"],self.paramdict["D_trans"],self.paramdict["measurement_error"])
+        predictions = Experimental_Lfit.GP_predict(params,data_traj,sample,self.paramdict["window_size"],self.paramdict["dt"],self.paramdict["upscale_factor"],self.paramdict["weighting_kernel"],self.paramdict["gamma_trans"],self.paramdict["D_trans"],self.paramdict["measurement_error"])
                 
         # compute log-likelihood and derivatives
-        LLH = Lfit.GP_LogLikelihood(predictions,data_traj,self.paramdict["measurement_error"])
+        LLH = Experimental_Lfit.GP_LogLikelihood(predictions,data_traj,self.paramdict["measurement_error"])
         return LLH
     
     def Compute_LLH(self,params):
