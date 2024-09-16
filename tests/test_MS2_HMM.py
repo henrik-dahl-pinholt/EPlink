@@ -5,6 +5,7 @@ from EPlink import MS2_HMM
 import numpy as np
 from jax import scipy as jsp
 import jax
+import jax.numpy as jnp
 
 def test_cp_state():
     """Test that the compound state sequence propagates as expected by comparing it to the single promoter state sequence once unwrapped"""    
@@ -66,9 +67,10 @@ def test_Generate_trajectory():
     nsteps = 100
     nsamples = 100000
     state_0 = np.array([0,1]) # start in the on stat
-    T_mat = np.eye(len(T))+T*dt
+    ts = jnp.arange(nsteps)
+    k_on_driver = k_on*jnp.ones(nsteps)
 
-    samples = MS2_HMM.Generate_sample(T_mat,nsteps,state_0,nsamples,verbose=False)
+    samples = MS2_HMM.Generate_sample(k_on_driver,k_off,state_0,nsamples,nstates,dt,verbose=False)
 
     theory_line = np.exp(-(k_off+k_on)*np.arange(nsteps+1)*dt)+(k_on/(k_off+k_on))*(1-np.exp(-(k_off+k_on)*np.arange(nsteps+1)*dt))
     assert np.allclose(np.mean(samples,axis=0),theory_line,atol=0.01)
@@ -82,7 +84,7 @@ def test_mean_calc():
 
     smap,state_sequences = MS2_HMM.Generate_state_map(nstates,window_size)        
     
-    state_emission_means = MS2_HMM.swap_inds_for_rates(state_sequences,loading_rates)@MS2_HMM.MS2_weighting_func(np.arange(window_size),tau)
+    state_emission_means = MS2_HMM.swap_inds_for_rates(state_sequences,loading_rates)@MS2_HMM.MS2_kernel(np.arange(window_size),tau)
     assert state_emission_means[0]==15.
     assert state_emission_means[1]==17.5
     assert state_emission_means[-1]==100.
@@ -93,7 +95,7 @@ def test_mean_calc():
 
     smap,state_sequences = MS2_HMM.Generate_state_map(nstates,window_size)        
     
-    state_emission_means = MS2_HMM.swap_inds_for_rates(state_sequences,loading_rates)@MS2_HMM.MS2_weighting_func(np.arange(window_size),tau)
+    state_emission_means = MS2_HMM.swap_inds_for_rates(state_sequences,loading_rates)@MS2_HMM.MS2_kernel(np.arange(window_size),tau)
     assert state_emission_means[0]==8.5
     assert state_emission_means[1]==11.5
     assert state_emission_means[-1]==85.

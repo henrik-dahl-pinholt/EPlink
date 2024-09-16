@@ -203,70 +203,70 @@ def Generate_state_map(nstates, window_size):
     return state_map, jnp.array(state_sequences)
 
 
-# def Project_to_single_states(cp_probs, state_map, timepoints, n_single_states):
-#     """Project the compound promoter state probabilities to the single states. The projected probabilities at timepoint i is defined as the sum of the probabilities of all compound states that have the same single state at timepoint i.
+def Project_to_single_states(cp_probs, state_map, timepoints, n_single_states):
+    """Project the compound promoter state probabilities to the single states. The projected probabilities at timepoint i is defined as the sum of the probabilities of all compound states that have the same single state at timepoint i.
 
-#     Parameters
-#     ----------
-#     cp_probs : ndarray
-#         Array with the probabilities of the compound states
-#     state_map : dict
-#         Dictionary with the mapping from the compound states to the single states
-#     timepoint : list of int
-#         Timepoints where the projected probabilities are to be computed
-#     n_single_states : int
-#         Number of single states in the model
+    Parameters
+    ----------
+    cp_probs : ndarray
+        Array with the probabilities of the compound states
+    state_map : dict
+        Dictionary with the mapping from the compound states to the single states
+    timepoint : list of int
+        Timepoints where the projected probabilities are to be computed
+    n_single_states : int
+        Number of single states in the model
 
-#     Returns
-#     -------
-#     ndarray
-#         (len(timepoints),n_single_states) array with the probabilities of the single states at each timepoint
-#     """
-#     single_probs = np.zeros((len(timepoints), n_single_states))
-#     for key, value in state_map.items():
-#         for i, timepoint in enumerate(timepoints):
-#             for j in range(n_single_states):
-#                 if key[timepoint] == str(j):
-#                     single_probs[i, j] += cp_probs[value]
+    Returns
+    -------
+    ndarray
+        (len(timepoints),n_single_states) array with the probabilities of the single states at each timepoint
+    """
+    single_probs = np.zeros((len(timepoints), n_single_states))
+    for key, value in state_map.items():
+        for i, timepoint in enumerate(timepoints):
+            for j in range(n_single_states):
+                if key[timepoint] == str(j):
+                    single_probs[i, j] += cp_probs[value]
 
-#     return np.array(single_probs)
+    return np.array(single_probs)
 
 
-# def Unwrap_cp_probabilities(cp_probs, smap, window_size):
-#     """Compute the probability sequence of the single timepoint HMM from a combound state probability sequence. This is done by marginalizing and keeping track of only newly introduced information. For the first timepoint all marginal probabilities are computed, while for the rest only marginalization over the latest timepoint is added.
+def Unwrap_cp_probabilities(cp_probs, smap, window_size):
+    """Compute the probability sequence of the single timepoint HMM from a combound state probability sequence. This is done by marginalizing and keeping track of only newly introduced information. For the first timepoint all marginal probabilities are computed, while for the rest only marginalization over the latest timepoint is added.
 
-#     Parameters
-#     ----------
-#     cp_probs : iterable of cp probability vectors
-#         Iterable with the probability vectors of the compound state sequence
-#     smap : dict
-#         Dictionary with the mapping from the string form of the compound states to the indices in the probability vectors
-#     window_size : int
-#         Number of timepoints it takes the polymerase to traverse the gene
+    Parameters
+    ----------
+    cp_probs : iterable of cp probability vectors
+        Iterable with the probability vectors of the compound state sequence
+    smap : dict
+        Dictionary with the mapping from the string form of the compound states to the indices in the probability vectors
+    window_size : int
+        Number of timepoints it takes the polymerase to traverse the gene
 
-#     Returns
-#     -------
-#     list
-#         List with the probability vectors of the single state sequence corresponding to the compound state sequence
-#     """
-#     nstates = int(len(cp_probs[0]) ** (1 / window_size))
+    Returns
+    -------
+    list
+        List with the probability vectors of the single state sequence corresponding to the compound state sequence
+    """
+    nstates = int(len(cp_probs[0]) ** (1 / window_size))
 
-#     # to compare with the cp states we unwrap them to the single states
-#     cp_unwrapped = []
+    # to compare with the cp states we unwrap them to the single states
+    cp_unwrapped = []
 
-#     # unwrap the initial state
-#     for state in Project_to_single_states(
-#         cp_probs[0], smap, list(range(window_size)), nstates
-#     ):
-#         cp_unwrapped.append(state)
+    # unwrap the initial state
+    for state in Project_to_single_states(
+        cp_probs[0], smap, list(range(window_size)), nstates
+    ):
+        cp_unwrapped.append(state)
 
-#     # unwrap the rest of the states by only adding the newest state
-#     for i in range(1, len(cp_probs)):
-#         unwrapped_last = Project_to_single_states(
-#             cp_probs[i], smap, [window_size - 1], nstates
-#         )
-#         cp_unwrapped.append(unwrapped_last[0])
-#     return cp_unwrapped
+    # unwrap the rest of the states by only adding the newest state
+    for i in range(1, len(cp_probs)):
+        unwrapped_last = Project_to_single_states(
+            cp_probs[i], smap, [window_size - 1], nstates
+        )
+        cp_unwrapped.append(unwrapped_last[0])
+    return cp_unwrapped
 
 #     # def Generate_sample(T_mat, nsteps, state_0, nsamples, verbose=False):
 #     # """Generate a sample from the single timepoint HMM
@@ -334,8 +334,8 @@ def Generate_state_map(nstates, window_size):
 #     # compute the propagators
 
 
-def Generate_sample(k_ons, k_off, state_0, nsamples, verbose=False, seed=None):
-    """Generate samples of a two-state promoter model with time-varying on rates
+def Generate_sample(k_ons, k_off, state_0, nsamples,nstates,dt, verbose=False, seed=None):
+    """Generate samples of an n-state promoter model with time-varying on rates
 
     Parameters
     ----------
@@ -347,6 +347,10 @@ def Generate_sample(k_ons, k_off, state_0, nsamples, verbose=False, seed=None):
         Initial state probabilities (must sum to 1)
     nsamples : int
         Number of samples to generate
+    nstates : int
+        Number of states in the single promoter model
+    dt : float
+        Time step of the measurements
     verbose : bool, optional
         Wether to display a progress bar for the sample generation, by default False
     seed : int, optional
@@ -355,7 +359,7 @@ def Generate_sample(k_ons, k_off, state_0, nsamples, verbose=False, seed=None):
     Returns
     -------
     (nsamples,nsteps+1) array
-        Array with the samples from the two-state promoter model
+        Array with the samples from the n-state promoter model
     """
     nsteps = len(k_ons)
 
