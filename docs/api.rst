@@ -9,10 +9,10 @@ EPlink.Polymer_inference
    :undoc-members:
    :show-inheritance:
 
-EPlink.Compute
+EPlink.MS2_HMM
 -----------------------------
 
-.. automodule:: EPlink.Compute
+.. automodule:: EPlink.MS2_HMM
    :members:
    :undoc-members:
    :show-inheritance:
