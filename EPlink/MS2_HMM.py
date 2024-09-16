@@ -3,7 +3,6 @@ from jax import numpy as jnp
 import jax.scipy as jsp
 from jax.experimental import sparse
 import numpy as np
-from matplotlib import pyplot as plt
 import itertools
 from tqdm import tqdm
 
