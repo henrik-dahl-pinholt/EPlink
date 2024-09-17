@@ -26,7 +26,7 @@ def get_transition_matrix(nstates, kon, koff):
     """
     # Initialize the transition rate matrix
     k_on_matrix = np.zeros((nstates, nstates))
-    
+
     k_off_matrix = np.zeros((nstates, nstates))
     # Fill in the diagonal elements
     for i in range(nstates):
@@ -42,8 +42,9 @@ def get_transition_matrix(nstates, kon, koff):
     for i in range(nstates - 1):
         k_off_matrix[i, i + 1] = 1
         k_on_matrix[i + 1, i] = 1
-        
-    return jnp.array(k_on_matrix) * kon + jnp.array(k_off_matrix) * koff  
+
+    return jnp.array(k_on_matrix) * kon + jnp.array(k_off_matrix) * koff
+
 
 # various parrallelized functions to compute transition rate matrices and transition probability matrices
 v_get_transition_matrix_single = jax.vmap(
@@ -170,6 +171,7 @@ def get_cp_transition_matrix(T, window_size, verbose=False):
         *compute_matrix_scaffold(T.shape[0], window_size, verbose), T, window_size
     )
 
+
 # parallelized function to compute the compound promoter transition matrix given multiple single promoter transition matrices
 v_get_cp_transition_matrix = jax.vmap(
     jax.vmap(get_cp_transition_matrix, in_axes=(0, None)), in_axes=(0, None)
@@ -267,6 +269,7 @@ def Unwrap_cp_probabilities(cp_probs, smap, window_size):
         cp_unwrapped.append(unwrapped_last[0])
     return cp_unwrapped
 
+
 #     # def Generate_sample(T_mat, nsteps, state_0, nsamples, verbose=False):
 #     # """Generate a sample from the single timepoint HMM
 
@@ -333,7 +336,9 @@ def Unwrap_cp_probabilities(cp_probs, smap, window_size):
 #     # compute the propagators
 
 
-def Generate_sample(k_ons, k_off, state_0, nsamples,nstates,dt, verbose=False, seed=None):
+def Generate_sample(
+    k_ons, k_off, state_0, nsamples, nstates, dt, verbose=False, seed=None
+):
     """Generate samples of an n-state promoter model with time-varying on rates
 
     Parameters
@@ -429,22 +434,26 @@ def swap_inds_for_rates(arr, rates):
 
 
 @jax.jit
-def MS2_kernel(i, tau):
+def MS2_kernel(i, tau, window_size):
     """Computes the MS2 kernel for a given timepoint i and a given delay tau
 
     Parameters
     ----------
-    i : float
+    i : float, array
         Timepoint to compute the kernel for
     tau : float
         time for the polymerase to go through the MS2 array
+    window_size : float
+        Time it takes the polymerase to traverse the gene
 
     Returns
     -------
-    float
+    float, array
         The MS2 kernel
     """
-    return jnp.heaviside(i - tau, 1) + jnp.heaviside(tau - i, 0) * i / tau
+    return (
+        jnp.heaviside(i - tau, 1) + jnp.heaviside(tau - i, 0) * i / tau
+    ) * jnp.heaviside(window_size - i, 0)
 
 
 def Get_emission_means(state_sequences, loading_rates, window_size, tau, dt):
@@ -470,7 +479,7 @@ def Get_emission_means(state_sequences, loading_rates, window_size, tau, dt):
     """
     return (
         swap_inds_for_rates(state_sequences, loading_rates)
-        @ MS2_kernel(jnp.arange(window_size), tau)[::-1]
+        @ MS2_kernel(jnp.arange(window_size), tau, window_size)[::-1]
         * dt
     )
 
@@ -561,7 +570,7 @@ def Gen_MS2_measurement(pol2_rates, params, dt, random_pol2=False):
     """
     # unpack the parameters
     w, tau, noise_std = params
-    kernel_func = MS2_kernel(jnp.arange(w), tau)
+    kernel_func = MS2_kernel(jnp.arange(w), tau, w)
 
     # Compute the number of polymerases loaded at each timepoint
     trajlen = pol2_rates.shape[1]
@@ -570,25 +579,30 @@ def Gen_MS2_measurement(pol2_rates, params, dt, random_pol2=False):
     else:
         pol2_nums = np.random.poisson(pol2_rates)
 
-    # Compute the MS2 signal by convolving the polymerase numbers with the MS2 kernel        
-    MS2_signal = (
-        v_conv(pol2_nums, kernel_func) * dt
-    )  
-    
+    # Compute the MS2 signal by convolving the polymerase numbers with the MS2 kernel
+    MS2_signal = v_conv(pol2_nums, kernel_func) * dt
+
     # compute the timepoints
     ts_MS2 = np.arange(w - 1, trajlen) * dt
     ts = np.arange(trajlen) * dt
-    
+
     # add noise to the MS2 signal
     signal = MS2_signal + np.random.normal(0, noise_std, MS2_signal.shape)
-    
+
     return (ts, pol2_nums), (ts_MS2, MS2_signal, signal)
 
 
 def Run_forward_filter(
-    state_sequences, k_off, k_ons, observation, measurement_error,loading_rates,compute_viterbi=False,verbose=False
+    state_sequences,
+    k_off,
+    k_ons,
+    observation,
+    measurement_error,
+    loading_rates,
+    compute_viterbi=False,
+    verbose=False,
 ):
-    """Run the forward filter for the two-state promoter model with time-varying on rates. 
+    """Run the forward filter for the two-state promoter model with time-varying on rates.
 
     Parameters
     ----------
@@ -621,10 +635,14 @@ def Run_forward_filter(
         Most likely state sequence for each sample unwrapped to the single state model (only returned if compute_viterbi is True)
     """
 
-    #check that k_ons have the same shape as the observation. This will not throw an error if not checked as the sparse array format doesn't check shapes.
+    # check that k_ons have the same shape as the observation. This will not throw an error if not checked as the sparse array format doesn't check shapes.
     if k_ons.shape != observation.shape:
-        raise ValueError("The shape of k_on and the observation should match but got {} and {}".format(k_on.shape,observation.shape))
-    
+        raise ValueError(
+            "The shape of k_on and the observation should match but got {} and {}".format(
+                k_on.shape, observation.shape
+            )
+        )
+
     # compute the prior probabilities from the single state prior
     priors_un_norm = jnp.array(
         [
@@ -660,7 +678,7 @@ def Run_forward_filter(
 
     # compute the log likelihood for the first measurement
     LLH = jnp.log(alpha.sum(axis=1)).sum()
-    
+
     # initialize the viterbi variables if needed
     if compute_viterbi:
         pi_vals = jnp.zeros(
@@ -679,20 +697,18 @@ def Run_forward_filter(
     T_s = v_get_transition_matrix(nstates, k_ons, k_off)
     pmats = v_matrix_exp(T_s * dt)
     pmats_cp = v_get_cp_transition_matrix(pmats, window_size)
-    
+
     # make iterator
     if verbose:
         iterator = tqdm(list(range(1, observation.shape[1])))
     else:
         iterator = range(1, observation.shape[1])
-        
+
     # run the forward filter
     for i in iterator:
         # Propagate the probability to get the prior for the observation
         pmat_cps = pmats_cp[:, i]
-        prior = vmat_prod(
-            pmat_cps, posteriors[:, i - 1]
-        )  
+        prior = vmat_prod(pmat_cps, posteriors[:, i - 1])
 
         # compute the probabilities of observing the data given the state of the promoter model
         p_data = vGaussian_measurement_model(
@@ -702,24 +718,24 @@ def Run_forward_filter(
         alpha = p_data * prior
         posteriors = posteriors.at[:, i].set(alpha / jnp.sum(alpha, axis=1)[:, None])
 
-        # compute the log likelihood for the observation 
+        # compute the log likelihood for the observation
         LLH += jnp.log(alpha.sum(axis=1)).sum()
 
         # compute the viterbi variables if needed
         if compute_viterbi:
-            # propagation of the most likely probability from the previous timepoint with the probability of observing the measurement. 
+            # propagation of the most likely probability from the previous timepoint with the probability of observing the measurement.
             newvals = (
                 pi_vals[:, i - 1][:, :, None] + jnp.log(p_data)[:, None]
             ).swapaxes(1, 2) + jnp.log(pmat_cps.todense())
-            
+
             # compute the most likely state and the probability of that state
             amax = jnp.argmax(newvals, axis=-1)
             pi_vals = pi_vals.at[:, i].set(newvals.max(axis=-1))
-            
+
             # store the paths to the most likely state
             Q_vals = Q_vals.at[:, i].set(amax)
 
-    # Compute the most likely state sequence if needed 
+    # Compute the most likely state sequence if needed
     if compute_viterbi:
         # initialize the path with the most likely state at the last timepoint
         path = jnp.zeros(observation.shape, dtype=int)
@@ -805,15 +821,14 @@ def Run_forward_filter(
 # tx.set(xlabel="Time", ylabel="Signal")
 
 
-
 # def LLHfunc(params):
 #     k_on,k_off,measurement_error,r1,r2 = jnp.exp(params)
 #     k_on_driver = k_on*jnp.ones(ntimesteps)
 #     k_ons = jnp.repeat(k_on_driver[:observation.shape[1] ][None, :], nsamples, axis=0)
-    
+
 #     posteriors, LLH = Run_forward_filter(
 #     pmat_cp, state_sequences, k_off, k_ons, observation, measurement_error,[r1,r2],compute_viterbi=False,verbose=False
-# )   
+# )
 #     return -LLH
 # vgf = jax.value_and_grad(LLHfunc)
 
@@ -823,8 +838,8 @@ def Run_forward_filter(
 #         val = np.inf
 #     if type(params) == np.ndarray:
 #         print(np.exp(params),val)
-    
-    
+
+
 #     return val,grad
 
 # print(f"Aiming for [{k_on},{k_off},{measurement_error},{loading_rates[0]},{loading_rates[1]}]")
