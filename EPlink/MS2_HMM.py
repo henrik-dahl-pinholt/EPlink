@@ -599,6 +599,9 @@ def Run_forward_filter(
     observation,
     measurement_error,
     loading_rates,
+    window_size,
+    tau,
+    dt,
     compute_viterbi=False,
     verbose=False,
 ):
@@ -618,6 +621,12 @@ def Run_forward_filter(
         Standard deviation of the measurement noise
     loading_rates : (2,) array
         Array with the expected loading counts for the promoter states
+    window_size : int
+        Number of timepoints it takes the polymerase to traverse the gene
+    tau : float
+        Time for the polymerase to go through the MS2 array
+    dt : float
+        Time step of the measurements
     compute_viterbi : bool, optional
         Wether to compute the most likely state sequence (viterbi path). This takes longer to compute so may not be of interest if one seeks only the log likelihood, by default False
     verbose : bool, optional
@@ -634,12 +643,13 @@ def Run_forward_filter(
     unwrapped_paths : (nsamples,nsteps) array
         Most likely state sequence for each sample unwrapped to the single state model (only returned if compute_viterbi is True)
     """
+    nstates = 2  # hard coded for now
 
     # check that k_ons have the same shape as the observation. This will not throw an error if not checked as the sparse array format doesn't check shapes.
     if k_ons.shape != observation.shape:
         raise ValueError(
             "The shape of k_on and the observation should match but got {} and {}".format(
-                k_on.shape, observation.shape
+                k_ons.shape, observation.shape
             )
         )
 
@@ -754,7 +764,7 @@ def Run_forward_filter(
     return posteriors, LLH
 
 
-# vmat_prod = jax.vmap(lambda pmat_cp, posterior: pmat_cp @ posterior, in_axes=(0, 0))
+vmat_prod = jax.vmap(lambda pmat_cp, posterior: pmat_cp @ posterior, in_axes=(0, 0))
 
 # nstates = 2
 # k_on = 1.0
