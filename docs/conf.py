@@ -6,35 +6,47 @@
 # -- Project information -----------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#project-information
 
-#add path to allow autodoc to find files to generate documentation from
+# add path to allow autodoc to find files to generate documentation from
 import os
 import sys
+
 sys.path.insert(0, os.path.abspath("../"))
 
-project = 'EPlink'
-copyright = '2024, Henrik Dahl Pinholt'
-author = 'Henrik Dahl Pinholt'
-
+project = "EPlink"
+copyright = "2024, Henrik Dahl Pinholt"
+author = "Henrik Dahl Pinholt"
 
 
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = ["sphinx_rtd_theme",
-              "nbsphinx",
-              'sphinx.ext.autodoc',
-              "sphinx.ext.napoleon"]
+extensions = [
+    "sphinx_rtd_theme",
+    "nbsphinx",
+    "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
+]
 
 # -- Napoleon configuration
 napoleon_google_docstring = False
 
-templates_path = ['_templates']
-exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'sphinx_rtd_theme'
-html_static_path = ['_static']
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
+
+
+# ensure that __init__ methods are not skipped in doc
+def skip(app, what, name, obj, would_skip, options):
+    if name == "__init__":
+        return False
+    return would_skip
+
+
+def setup(app):
+    app.connect("autodoc-skip-member", skip)
