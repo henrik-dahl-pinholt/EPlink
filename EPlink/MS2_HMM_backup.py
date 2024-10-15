@@ -508,53 +508,53 @@ def Run_forward_filter(
     return posteriors, LLH
 
 
-nstates = 2
-k_on = 1.0
-k_off = 1.0
-measurement_error = 0.5
-window_size = 10
-tau = 5
-loading_rates = np.array([1.0, 4.0])
-ntimesteps = 300
+# nstates = 2
+# k_on = 1.0
+# k_off = 1.0
+# measurement_error = 0.5
+# window_size = 10
+# tau = 5
+# loading_rates = np.array([1.0, 4.0])
+# ntimesteps = 300
 
-T = get_transition_matrix(nstates, k_on, k_off)
+# T = get_transition_matrix(nstates, k_on, k_off)
 
-dt = 0.1
-pmat = jsp.linalg.expm(T * dt)
-pmat_cp = get_cp_transition_matrix(pmat, window_size)
+# dt = 0.1
+# pmat = jsp.linalg.expm(T * dt)
+# pmat_cp = get_cp_transition_matrix(pmat, window_size)
 
-sample = Generate_sample(pmat, ntimesteps, np.array([1, 0]), 1, verbose=True)
-ts, signal, observation = Gen_MS2_measurement(
-    swap_inds_for_rates(sample[0], loading_rates),
-    (window_size, tau, measurement_error),
-    dt,
-)[1]
+# sample = Generate_sample(pmat, ntimesteps, np.array([1, 0]), 1, verbose=True)
+# ts, signal, observation = Gen_MS2_measurement(
+#     swap_inds_for_rates(sample[0], loading_rates),
+#     (window_size, tau, measurement_error),
+#     dt,
+# )[1]
 
-smap, state_sequences = Generate_state_map(nstates, window_size)
+# smap, state_sequences = Generate_state_map(nstates, window_size)
 
-posteriors, LLH, path, unwrapped_path = Run_forward_filter(
-    pmat_cp, state_sequences, k_off, k_on, observation, compute_viterbi=True
-)
-
-
-means = Get_emission_means(state_sequences, loading_rates, window_size, tau, dt)
-predicted_signal = jnp.array([means[pi] for pi in path])
+# posteriors, LLH, path, unwrapped_path = Run_forward_filter(
+#     pmat_cp, state_sequences, k_off, k_on, observation, compute_viterbi=True
+# )
 
 
-fig, ax = plt.subplots(2, 1, figsize=(10, 5), sharex=True)
-ax[0].plot(dt * jnp.arange(len(sample[0])), sample[0], label="True")
-ax[0].plot(ts, unwrapped_path, "--", label="Predicted")
+# means = Get_emission_means(state_sequences, loading_rates, window_size, tau, dt)
+# predicted_signal = jnp.array([means[pi] for pi in path])
 
-ax[0].legend()
-ax[0].set(xlabel="Time", ylabel="State", yticks=[0, 1], yticklabels=["Off", "On"])
-ax[0].legend(loc="lower right")
-tx = ax[1]
-tx.plot(ts, observation, label="Observed")
-tx.plot(ts, signal, label="True")
-tx.plot(ts, predicted_signal, "--", label="Predicted")
-tx.legend(loc="lower right")
-tx.set(xlabel="Time", ylabel="Signal")
-# fig.savefig("test.png",dpi=500)
+
+# fig, ax = plt.subplots(2, 1, figsize=(10, 5), sharex=True)
+# ax[0].plot(dt * jnp.arange(len(sample[0])), sample[0], label="True")
+# ax[0].plot(ts, unwrapped_path, "--", label="Predicted")
+
+# ax[0].legend()
+# ax[0].set(xlabel="Time", ylabel="State", yticks=[0, 1], yticklabels=["Off", "On"])
+# ax[0].legend(loc="lower right")
+# tx = ax[1]
+# tx.plot(ts, observation, label="Observed")
+# tx.plot(ts, signal, label="True")
+# tx.plot(ts, predicted_signal, "--", label="Predicted")
+# tx.legend(loc="lower right")
+# tx.set(xlabel="Time", ylabel="Signal")
+# # fig.savefig("test.png",dpi=500)
 
 
 # # test that propagation under both the single and compound promoter models are the same

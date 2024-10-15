@@ -256,7 +256,7 @@ forward_d_vmap.__doc__ = """Vectorized version of Propagate_Forward_diagonal. Ta
     """
 
 
-def Generate_trajectory(nsteps, dt, n_trajectories, k, D, N, seed=0, verbose=False):
+def Generate_trajectory(nsteps, dt, n_trajectories, k, D, N, seed=None, verbose=False):
     """Generate a trajectory of a polymer chain with Rouse dynamics starting from the steady-state ensemble
 
     Parameters
@@ -274,7 +274,7 @@ def Generate_trajectory(nsteps, dt, n_trajectories, k, D, N, seed=0, verbose=Fal
     N : int
         Number of beads in the polymer
     seed : int, optional
-        seed for the random number generator, by default 0
+        seed for the random number generator, by default generated randomly
     verbose : bool, optional
         Print progress of the simulation, by default False
 
@@ -301,15 +301,20 @@ def Generate_trajectory(nsteps, dt, n_trajectories, k, D, N, seed=0, verbose=Fal
     Qmat, eigvals = Get_eigensystem(N)
 
     # initialize containers for the polymer coordinates and current Rouse mode vectors
-    key = jax.random.PRNGKey(seed)
+    if seed is None:
+        seed = np.random.randint(10000000)
+        
+    subkey = jax.random.PRNGKey(seed)
+    key, subkey = jax.random.split(subkey)
+    
     a_samples = np.zeros((nsteps, n_trajectories, N - 1))
     mean_0, covar_0 = jnp.zeros((n_trajectories, N - 1)), (D / k / eigvals) * jnp.ones(
         (n_trajectories, N - 1)
     )
 
     # generate Gaussian samples for the Rouse modes (faster to generate a-priori on the GPU than at each time step)
-    gaussian_samples = jax.random.normal(key, (n_trajectories, nsteps, N - 1))
-    a_samples[0] = mean_0 + gaussian_samples[:, 0] * jnp.sqrt(
+    gaussian_samples = jax.random.normal(key, (n_trajectories, N - 1))
+    a_samples[0] = mean_0 + gaussian_samples * jnp.sqrt(
         covar_0
     )  # set the initial conditions
     if verbose:
@@ -319,7 +324,10 @@ def Generate_trajectory(nsteps, dt, n_trajectories, k, D, N, seed=0, verbose=Fal
     for i in iterator:
         # propagate the Rouse modes forward in time and store
         new_mean, new_cov = forward_d_vmap(a_samples[i - 1], dt, k, eigvals, D)
-        a_samples[i] = new_mean + gaussian_samples[:, i] * jnp.sqrt(new_cov)
+        
+        key, subkey = jax.random.split(subkey)
+        gaussian_samples = jax.random.normal(key, (n_trajectories, N - 1))
+        a_samples[i] = new_mean + gaussian_samples * jnp.sqrt(new_cov)
 
     # convert the Rouse modes to physical coordinates and output
     polymer_coords = jnp.einsum("ijk,lk->ijl", a_samples, Qmat)
@@ -378,8 +386,8 @@ class ForwardFilter:
         observation_times : jax array
             Array of times at which the measurements are taken
         measurement_errors : (nsamples) jax array or float
-            Standard deviation of the Gaussian measurement noise, if float, will be broadcasted to all measurements
-        w : (N) jax array
+            Standard deviation of the Gaussian measurement noise on a single locus, if float, will be broadcasted to all measurements
+        w : (N,) jax array
             Projection vector from which the measurement was obtained from the polymer configurations.
         """
         # Store the model parameters
@@ -520,7 +528,7 @@ class PosteriorSampler:
         observation_times : (ntimesteps) jax array
             Array of times at which the measurements are taken
         measurement_errors : (nsamples) jax array or float
-            Standard deviation of the Gaussian measurement noise, if float, will be broadcasted to all measurements
+            Standard deviation of the Gaussian measurement noise on a single locus, if float, will be broadcasted to all measurements
         w : (N) jax array
             Projection vector from which the measurement was obtained from the polymer configurations.
         """

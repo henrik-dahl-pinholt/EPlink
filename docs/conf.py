@@ -25,6 +25,7 @@ extensions = [
     "nbsphinx",
     "sphinx.ext.autodoc",
     "sphinx.ext.napoleon",
+    "spinx.ext.linkcode",
 ]
 
 # -- Napoleon configuration

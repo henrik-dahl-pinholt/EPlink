@@ -409,7 +409,7 @@ def Generate_sample(
         transition_probs = T_mat.T[samples[:, i]]
         samples[:, i + 1] = v_sample_state(keys, transition_probs)
 
-    return np.array(samples)
+    return samples[:, 1:]
 
 
 def swap_inds_for_rates(arr, rates):
@@ -427,9 +427,9 @@ def swap_inds_for_rates(arr, rates):
     array
         Array with the integer values swapped for the values in the rates array
     """
-    arr_out = jnp.zeros(arr.shape)
+    arr_out = np.zeros(arr.shape)
     for i, rate in enumerate(rates):
-        arr_out = arr_out.at[arr == i].set(rate)
+        arr_out[arr == i] = rate
     return arr_out
 
 
@@ -456,7 +456,7 @@ def MS2_kernel(i, tau, window_size):
     ) * jnp.heaviside(window_size - i, 0)
 
 
-def Get_emission_means(state_sequences, loading_rates, window_size, tau, dt):
+def Get_emission_means(state_sequences, loading_rates, window_size, tau):
     """Computes the mean of the emission distribution for each state in the model
 
     Parameters
@@ -480,7 +480,6 @@ def Get_emission_means(state_sequences, loading_rates, window_size, tau, dt):
     return (
         swap_inds_for_rates(state_sequences, loading_rates)
         @ MS2_kernel(jnp.arange(window_size), tau, window_size)[::-1]
-        * dt
     )
 
 
@@ -579,8 +578,8 @@ def Gen_MS2_measurement(pol2_rates, params, dt, random_pol2=False):
     else:
         pol2_nums = np.random.poisson(pol2_rates)
 
-    # Compute the MS2 signal by convolving the polymerase numbers with the MS2 kernel
-    MS2_signal = v_conv(pol2_nums, kernel_func) * dt
+    # Compute the MS2 signal by weighting the polymerase numbers with the MS2 kernel
+    MS2_signal = v_conv(pol2_nums, kernel_func)
 
     # compute the timepoints
     ts_MS2 = np.arange(w - 1, trajlen) * dt
@@ -654,6 +653,8 @@ def Run_forward_filter(
         )
 
     # compute the prior probabilities from the single state prior
+    avg_kons = jnp.mean(k_ons, axis=1)
+
     priors_un_norm = jnp.array(
         [
             jnp.exp(
@@ -664,42 +665,47 @@ def Run_forward_filter(
                     )
                 ).sum(axis=1)
             )
-            for k_on in k_ons[:, 0]
+            for k_on in avg_kons
         ]
     )
+
     priors = priors_un_norm / jnp.sum(priors_un_norm, axis=1)[:, None]
 
     # compute the emission probabilities for the input loading rates
     state_emission_means = Get_emission_means(
-        state_sequences, loading_rates, window_size, tau, dt
+        state_sequences, loading_rates, window_size, tau
     )
-
+    if np.all(state_emission_means == 0):
+        raise ValueError(
+            "All emission means are zero. The emission model must be wrong."
+        )
     # compute the probabilities of observing the data given the state of the promoter model
     p_data = vGaussian_measurement_model(
         observation[:, 0], state_emission_means, measurement_error
     )
+
     alpha = p_data * priors
 
     # initialize the posteriors (forward pass probabilities)
-    posteriors = jnp.zeros(
+    posteriors = np.zeros(
         (observation.shape[0], observation.shape[1], len(state_emission_means))
     )
-    posteriors = posteriors.at[:, 0].set(alpha / jnp.sum(alpha, axis=1)[:, None])
+    posteriors[:, 0] = alpha / jnp.sum(alpha, axis=1)[:, None]
 
     # compute the log likelihood for the first measurement
-    LLH = jnp.log(alpha.sum(axis=1)).sum()
+    LLH = jnp.log(alpha.sum(axis=1))
 
     # initialize the viterbi variables if needed
     if compute_viterbi:
-        pi_vals = jnp.zeros(
+        pi_vals = np.zeros(
             (observation.shape[0], observation.shape[1], len(state_emission_means))
         )
-        Q_vals = jnp.zeros(
+        Q_vals = np.zeros(
             (observation.shape[0], observation.shape[1], len(state_emission_means)),
             dtype=int,
         )
 
-        pi_vals = pi_vals.at[:, 0].set(jnp.log(posteriors[:, 0]))
+        pi_vals[:, 0] = jnp.log(posteriors[:, 0])
         # need to convert the sparse matrix to a dense one for the viterbi algorithm as we need some fancy outer sum things that the sparse format can't handle.
         # pmat_dense = pmat_cp.todense()
 
@@ -726,10 +732,10 @@ def Run_forward_filter(
         )
         # compute the posterior probabilities for the observation using bayes rule
         alpha = p_data * prior
-        posteriors = posteriors.at[:, i].set(alpha / jnp.sum(alpha, axis=1)[:, None])
+        posteriors[:, i] = alpha / jnp.sum(alpha, axis=1)[:, None]
 
         # compute the log likelihood for the observation
-        LLH += jnp.log(alpha.sum(axis=1)).sum()
+        LLH += jnp.log(alpha.sum(axis=1))
 
         # compute the viterbi variables if needed
         if compute_viterbi:
@@ -740,23 +746,23 @@ def Run_forward_filter(
 
             # compute the most likely state and the probability of that state
             amax = jnp.argmax(newvals, axis=-1)
-            pi_vals = pi_vals.at[:, i].set(newvals.max(axis=-1))
+            pi_vals[:, i] = newvals.max(axis=-1)
 
             # store the paths to the most likely state
-            Q_vals = Q_vals.at[:, i].set(amax)
+            Q_vals[:, i] = amax
 
     # Compute the most likely state sequence if needed
     if compute_viterbi:
         # initialize the path with the most likely state at the last timepoint
-        path = jnp.zeros(observation.shape, dtype=int)
-        path = path.at[:, -1].set(jnp.argmax(pi_vals[:, -1], axis=1))
+        path = np.zeros(observation.shape, dtype=int)
+        path[:, -1] = jnp.argmax(pi_vals[:, -1], axis=1)
 
         # backtrack to get the most likely state sequence
         for i in range(observation.shape[1] - 1, 0, -1):
             next_vals = Q_vals[:, i, :][
                 jnp.arange(len(observation)), path[:, i][jnp.arange(len(observation))]
             ]
-            path = path.at[:, i - 1].set(next_vals)
+            path[:, i - 1] = next_vals
 
         # unwrap the compound state sequence to the single state sequence
         unwrapped_paths = state_sequences[path, -1]
@@ -765,7 +771,38 @@ def Run_forward_filter(
 
 
 vmat_prod = jax.vmap(lambda pmat_cp, posterior: pmat_cp @ posterior, in_axes=(0, 0))
+def Generate_Telegraph(kons,k_off,dt,seed=None,verbose=False):
+    nsamples, ntimesteps = kons.shape    
+    means = jnp.mean(kons,axis=1)
+    initial_probabilities = means / (means + k_off)
+    
+    if seed is None:
+        seed = np.random.randint(0,10000000000)
 
+    #draw random numbers for the simulation
+    key = jax.random.PRNGKey(seed)
+    rand_nums = jax.random.uniform(key, (nsamples, ntimesteps))
+
+    #Setup initial condition
+    out = np.ones((nsamples,ntimesteps))*np.nan
+    out[:,0] = rand_nums[:,0]<initial_probabilities
+
+    # setup the printing of the progress bar
+    if verbose:
+        iterator = tqdm(list(range(1,ntimesteps)))
+    else:
+        iterator = range(1,ntimesteps)
+
+    for i in iterator:
+        kons_here = kons[:,i]
+        pstar = kons_here/(kons_here+k_off)
+        
+        p_previous = out[:,i-1] 
+        pon_prop = pstar+(p_previous-pstar)*jnp.exp(-(k_off+kons_here)*dt)
+        
+        out[:,i] = rand_nums[:,i]<pon_prop
+    return out
+    
 # nstates = 2
 # k_on = 1.0
 # k_off = 1.0
